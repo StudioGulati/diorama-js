@@ -1,4 +1,4 @@
-class Vector3 {
+export class Vector3 {
     x
     y
     z
@@ -30,6 +30,8 @@ class Vector3 {
     static dot(a, b) {
         return a.x * b.x + a.y * b.y + a.z * b.z
     }
-}
 
-export {Vector3}
+    toString() {
+        return `(${this.x}, ${this.y}, ${this.z})`
+    }
+}
