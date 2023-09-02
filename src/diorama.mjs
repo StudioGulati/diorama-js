@@ -1,3 +1,5 @@
+import {Vector3} from "./math.mjs";
+
 class Diorama {
     constructor(canvas) {
         this.canvas = {
@@ -24,7 +26,7 @@ class Diorama {
         this.imageData = this.canvas.context.getImageData(0, 0, this.canvas.width, this.canvas.height);
         this.drawBuffer = this.imageData.data
 
-        this.O = [0, 0, 0] // camera position
+        this.camera = new Vector3() // the camera is initially positioned at the origin
         this.scene = []
         this.actions = {
             "up": false,
@@ -51,16 +53,19 @@ class Diorama {
     }
 
     update(deltaSeconds) {
-        this.O[0] += ((this.actions.right ? 1 : 0) + (this.actions.left ? -1 : 0)) * deltaSeconds
-        this.O[1] += ((this.actions.up ? 1 : 0) + (this.actions.down ? -1 : 0)) * deltaSeconds
+        this.camera.x += ((this.actions.right ? 1 : 0) + (this.actions.left ? -1 : 0)) * deltaSeconds
+        this.camera.y += ((this.actions.up ? 1 : 0) + (this.actions.down ? -1 : 0)) * deltaSeconds
     }
 
     draw() { // basic raytracing
         for (let cy = -this.canvas.yMax; cy < this.canvas.yMax; cy++) {
             for (let cx = -this.canvas.xMax; cx < this.canvas.xMax; cx++) {
                 // we compute the ray direction
-                const V = [cx * this.viewport.xScale + this.O[0], cy * this.viewport.yScale + this.O[1], this.viewport.zDistance]
-                const D = [V[0] - this.O[0], V[1] - this.O[1], V[2] - this.O[2]]
+                const V = new Vector3()
+                V.x = cx * this.viewport.xScale + this.camera.x
+                V.y = cy * this.viewport.yScale + this.camera.y
+                V.z = this.viewport.zDistance
+                const D = new Vector3(V.x - this.camera.x, V.y - this.camera.y, V.z - this.camera.z)
                 // we determine the color seen through the viewport
                 const [r, g, b] = this.getPixelColor(D, 1, Number.MAX_SAFE_INTEGER)
                 this.setPixelColor(cx, cy, [r, g, b])
@@ -70,20 +75,26 @@ class Diorama {
     }
 
     getPixelColor(D, tmin, tmax) {
+        let t
+        let color
         // we compute the intersections of the ray and each sphere in the scene
         for (const sphere of this.scene) {
-            const C = sphere.center
-            const r = sphere.radius
-            const a = D[0] * D[0] + D[1] * D[1] + D[2] * D[2]
-            const b = 2 * ((this.O[0] - C[0]) * D[0] + (this.O[1] - C[1]) * D[1] + (this.O[2] - C[2]) * D[2])
-            const c = Math.pow((this.O[0] - C[0]), 2) + Math.pow((this.O[1] - C[1]), 2) + Math.pow((this.O[2] - C[2]), 2) - Math.pow(r, 2)
-            const discriminant = Math.sqrt(Math.pow(b, 2) - 4 * a * c)
+            const C_camera = Vector3.difference(this.camera, sphere.center)
+            const a = Vector3.dot(D, D)
+            const b = 2 * Vector3.dot(C_camera, D)
+            const c = Vector3.dot(C_camera, C_camera) - sphere.radius * sphere.radius
+            const discriminant = Math.sqrt(b * b - 4 * a * c)
             const t1 = (-b + discriminant) / (2 * a)
             const t2 = (-b - discriminant) / (2 * a)
             if ((t1 > tmin && t1 < tmax) || (t2 > tmin && t2 < tmax)) {
-                return sphere.color
+                const ti = Math.min(t1, t2)
+                if (!t || ti < t) {
+                    t = ti
+                    color = sphere.color
+                }
             }
         }
+        if (t) return color
         return [255, 255, 255]
     }
 
@@ -110,7 +121,7 @@ class Diorama {
             for (const transform of document.getElementsByTagName("Transform")) {
                 const shape = transform.children[0]
                 const geometry = shape.children[0]
-                const center = transform.getAttribute("translation")
+                const [x, y, z] = transform.getAttribute("translation")
                     .split(" ").map(c => parseFloat(c))
                 const radius = parseInt(geometry.getAttribute("radius")) | 1
                 const color = shape.getElementsByTagName("Appearance")[0]
@@ -118,7 +129,7 @@ class Diorama {
                     .split(" ").map(c => Math.floor(255 * parseFloat(c)))
                 this.scene.push({
                     type: geometry.nodeName,
-                    center: center,
+                    center: new Vector3(x, y, z),
                     radius: radius,
                     color: color
                 })
