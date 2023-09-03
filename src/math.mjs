@@ -9,6 +9,10 @@ export class Vector3 {
         this.z = z
     }
 
+    norm() {
+        return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z)
+    }
+
     /**
      * Returns the result of subtracting one vector from another.
      *
