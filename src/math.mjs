@@ -14,6 +14,16 @@ export class Vector3 {
     }
 
     /**
+     *
+     * @param {Vector3} a
+     * @param {number} b
+     * @returns {Vector3}
+     */
+    static multiplication(a, b) {
+        return new Vector3(a.x * b, a.y * b, a.z * b)
+    }
+
+    /**
      * Returns the result of subtracting one vector from another.
      *
      * @param {Vector3} a

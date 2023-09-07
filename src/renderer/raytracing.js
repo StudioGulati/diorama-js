@@ -77,11 +77,12 @@ function setScene(s) {
     scene = s
     for (const sphere of scene.shapes) {
         sphere.center = new Vector3(sphere.center.x, sphere.center.y, sphere.center.z)
+        sphere.specularity = ~~(sphere.shininess === 1 ? 1000 : 100 * sphere.shininess / (1 - sphere.shininess))
     }
     for (const light of scene.lights) {
         switch (light.type) {
             case "DirectionalLight":
-                light.direction = new Vector3(light.direction.x, light.direction.y, light.direction.z)
+                light.direction = new Vector3(-light.direction.x, -light.direction.y, -light.direction.z)
                 break
             case "PointLight":
                 light.position = new Vector3(light.position.x, light.position.y, light.position.z)
@@ -160,14 +161,14 @@ function computePixelColor(D, tMin, tMax) {
         const C_P = Vector3.difference(P, sphereClosest.center)
         const C_P_length = C_P.norm()
         const N = new Vector3(C_P.x / C_P_length, C_P.y / C_P_length, C_P.z / C_P_length)
-        const i = computePixelIntensity(P, N)
-        return [sphereClosest.color[0] * i, sphereClosest.color[1] * i, sphereClosest.color[2] * i]
+        const i = computePixelIntensity(P, N, Vector3.multiplication(D, -1), sphereClosest.specularity)
+        return [~~(sphereClosest.color[0] * i), ~~(sphereClosest.color[1] * i), ~~(sphereClosest.color[2] * i)]
     } else {
         return [255, 255, 255]
     }
 }
 
-function computePixelIntensity(P, N) {
+function computePixelIntensity(P, N, V, specularity) {
     let i = 0
     for (const light of scene.lights) {
         if (light.type === "AmbientLight") {
@@ -179,10 +180,13 @@ function computePixelIntensity(P, N) {
             } else if (light.type === "PointLight") {
                 L = Vector3.difference(light.position, P)
             }
-            i += light.intensity * Math.max(0, Vector3.dot(N, L) / (N.norm() * L.norm()))
+            const R = Vector3.difference(Vector3.multiplication(N, 2 * Vector3.dot(N, L)), L)
+            const id = Math.max(0, Vector3.dot(N, L) / (N.norm() * L.norm()))
+            const is = Math.max(0, Vector3.dot(R, V) / (R.norm() * V.norm()))
+            i += light.intensity * (id + is ** specularity)
         }
     }
-    return i
+    return Math.min(1, i)
 }
 
 function paintPixel(cx, cy, [r, g, b]) {

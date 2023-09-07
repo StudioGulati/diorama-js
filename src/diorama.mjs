@@ -62,14 +62,15 @@ class Diorama {
                 const geometry = shape.children[0]
                 const center = parseVector(transform.getAttribute("translation"))
                 const radius = parseInt(geometry.getAttribute("radius")) || 1
-                const color = shape.getElementsByTagName("Appearance")[0]
-                    .getElementsByTagName("Material")[0].getAttribute("diffuseColor")
-                    .split(" ").map(c => Math.floor(255 * parseFloat(c)))
+                const material = shape.querySelector("Appearance").querySelector("Material")
+                const color = parseColor(material.getAttribute("diffuseColor"))
+                const shininess = parseFloat(material.getAttribute("shininess"))
                 this.#scene.shapes.push({
                     type: geometry.nodeName,
                     center: center,
                     radius: radius,
-                    color: color
+                    color: color,
+                    shininess: shininess
                 })
             }
             for (const light of document.querySelectorAll("DirectionalLight, PointLight")) {
@@ -110,7 +111,7 @@ class Diorama {
         }
     }
 
-    setAction(action, value) {
+    triggerAction(action, value) {
         switch (action) {
             case "ArrowUp":
                 this.#actions.up = value
@@ -144,11 +145,6 @@ class Diorama {
  *
  * See {@link https://www.web3d.org/specifications/X3dSchemaDocumentation4.0/x3d-4.0_SFVec3f.html SFVec3f}
  *
- * @typedef {Object} Vector
- * @property {number} x
- * @property {number} y
- * @property {number} z
- *
  * @param {string} value
  * @returns {Vector}
  */
@@ -156,3 +152,22 @@ function parseVector(value) {
     const [x, y, z] = value.split(" ").map(v => parseFloat(v))
     return {x, y, z}
 }
+
+/**
+ * Parses the X3D string format used to specify RGB (red-green-blue) color values.
+ *
+ * See {@link https://www.web3d.org/specifications/X3dSchemaDocumentation4.0/x3d-4.0_SFColor.html SFColor}
+ *
+ * @param {string} value
+ * @returns {number[]}
+ */
+function parseColor(value) {
+    return value.split(" ").map(v => Math.floor(255 * parseFloat(v)))
+}
+
+/**
+ * @typedef {Object} Vector
+ * @property {number} x
+ * @property {number} y
+ * @property {number} z
+ */
