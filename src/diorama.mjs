@@ -64,7 +64,7 @@ class Diorama {
                 const radius = parseInt(geometry.getAttribute("radius")) || 1
                 const material = shape.querySelector("Appearance").querySelector("Material")
                 const color = parseColor(material.getAttribute("diffuseColor"))
-                const shininess = parseFloat(material.getAttribute("shininess"))
+                const shininess = parseFloat(material.getAttribute("shininess")) || 0.2
                 this.#scene.shapes.push({
                     type: geometry.nodeName,
                     center: center,
@@ -132,6 +132,14 @@ class Diorama {
             this.#renderer.postMessage({actions: this.#actions})
         } else {
             this.#renderer.setActions(this.#actions)
+        }
+    }
+
+    resizeCanvas(dimensions) {
+        if (this.#options.useWorker) {
+            this.#renderer.postMessage({dimensions})
+        } else {
+            this.#renderer.setDimensions(dimensions)
         }
     }
 

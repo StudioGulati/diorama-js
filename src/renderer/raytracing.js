@@ -5,7 +5,11 @@ let context
 let imageData
 let drawBuffer
 
+let dimensions
+let aspectRatio
+
 let width, height
+let cWidth, cHeight
 let vWidth, vHeight
 
 let xMax, yMax
@@ -27,50 +31,38 @@ let actions = {
 export default {
     setCanvas: setCanvas,
     setScene: setScene,
-    setActions: setActions
+    setActions: setActions,
+    setDimensions: setDimensions
 }
 
 onmessage = (event) => {
-    if (event.data instanceof Object && Object.hasOwn(event.data, "canvas")) {
-        setCanvas(event.data.canvas)
-    } else if (event.data instanceof Object && Object.hasOwn(event.data, "scene")) {
-        setScene(event.data.scene)
-    } else if (event.data instanceof Object && Object.hasOwn(event.data, "actions")) {
-        setActions(event.data.actions)
+    if (event.data instanceof Object) {
+        if (Object.hasOwn(event.data, "canvas")) {
+            setCanvas(event.data.canvas)
+        } else if (Object.hasOwn(event.data, "scene")) {
+            setScene(event.data.scene)
+        } else if (Object.hasOwn(event.data, "actions")) {
+            setActions(event.data.actions)
+        } else if (Object.hasOwn(event.data, "dimensions")) {
+            setDimensions(event.data.dimensions)
+        }
     }
 }
 
 onerror = (event) => {
-    console.log(event)
+    console.error(event)
 }
 
 function setCanvas(c) {
     canvas = c
+    context = canvas.getContext("2d", {willReadFrequently: true})
 
+    dimensions = {width: canvas.offsetWidth, height: canvas.offsetHeight}
     width = canvas.width
     height = canvas.height
-
-    const aspectRatio = width / height
-    if (aspectRatio > 1) {
-        vWidth = 1
-        vHeight = 1 / aspectRatio
-    } else {
-        vWidth = aspectRatio
-        vHeight = 1
-    }
-
-    xMax = width / 2
-    yMax = height / 2
-
-    xScale = vWidth / width
-    yScale = vHeight / height
-    zDistance = 1
+    initialize()
 
     camera = new Vector3()
-
-    context = canvas.getContext("2d")
-    imageData = context.getImageData(0, 0, width, height)
-    drawBuffer = imageData.data
 }
 
 function setScene(s) {
@@ -90,7 +82,7 @@ function setScene(s) {
             default:
         }
     }
-    paint()
+    requestAnimationFrame(paint)
 }
 
 function setActions(a) {
@@ -99,6 +91,41 @@ function setActions(a) {
         previousTimeStamp = performance.now()
         animationRequestId = requestAnimationFrame((t) => animate(t))
     }
+}
+
+function setDimensions(d) {
+    dimensions = d
+    initialize()
+    requestAnimationFrame(paint)
+}
+
+function initialize() {
+    aspectRatio = dimensions.width / dimensions.height
+
+    if (aspectRatio > 1) { // landscape
+        canvas.width = width
+        canvas.height = ~~(height / aspectRatio)
+        vWidth = aspectRatio
+        vHeight = 1
+    } else { // portrait
+        canvas.width = ~~(width * aspectRatio)
+        canvas.height = height
+        vWidth = 1
+        vHeight = 1 / aspectRatio
+    }
+    cWidth = canvas.width
+    cHeight = canvas.height
+
+    xMax = ~~(cWidth / 2)
+    yMax = ~~(cHeight / 2)
+
+    const scale = Math.tan(53 * (Math.PI / 180) * 0.5)
+    xScale = (vWidth / cWidth) * scale
+    yScale = (vHeight / cHeight) * scale
+    zDistance = (aspectRatio > 1 ? aspectRatio : 1 / aspectRatio) * scale
+
+    imageData = context.getImageData(0, 0, cWidth, cHeight)
+    drawBuffer = imageData.data
 }
 
 function animate(timeStamp) {
@@ -121,8 +148,8 @@ function update(deltaSeconds) {
 }
 
 function paint() { // basic raytracing
-    for (let cy = -yMax; cy < yMax; cy++) {
-        for (let cx = -xMax; cx < xMax; cx++) {
+    for (let cy = -yMax; cy <= yMax; cy++) {
+        for (let cx = -xMax; cx <= xMax; cx++) {
             // we compute the ray direction
             const V = new Vector3(cx * xScale + camera.x, cy * yScale + camera.y, zDistance)
             const D = Vector3.difference(V, camera)
@@ -193,8 +220,8 @@ function paintPixel(cx, cy, [r, g, b]) {
     // we convert the position (cx, cy) from our coordinate space to the canvas grid
     const x = xMax + cx
     const y = yMax - cy
-    if ((x >= 0 && x < width) && (y >= 0 && y < height)) {
-        let indexOffset = (y * width + x) * 4
+    if ((x >= 0 && x < cWidth) && (y >= 0 && y < cHeight)) {
+        let indexOffset = (y * cWidth + x) * 4
         drawBuffer[indexOffset] = r
         drawBuffer[++indexOffset] = g
         drawBuffer[++indexOffset] = b
